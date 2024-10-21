@@ -148,6 +148,12 @@ PassiveScalars::PassiveScalars(MeshBlock *pmb, ParameterInput *pin)  :
     //next step size
     h.NewAthenaArray(nc3, nc2, nc1);
   }
+
+
+  // MM:get input related to zone-averaging
+  n_avg_.NewAthenaArray(nc2);
+  do_average_ = pin->GetOrAddBoolean("hydro","polar_average",false);
+
 }
 
 PassiveScalars::~PassiveScalars() {}

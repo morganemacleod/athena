@@ -282,6 +282,9 @@ class Mesh {
   AthenaArray<Real> *ruser_mesh_data;
   AthenaArray<int> *iuser_mesh_data;
 
+  bool user_force_output; //MM: make a flag to force output
+
+  
   // functions
   void Initialize(int res_flag, ParameterInput *pin);
   void SetBlockSizeAndBoundaries(LogicalLocation loc, RegionSize &block_size,
@@ -300,6 +303,7 @@ class Mesh {
   // defined in either the prob file or default_pgen.cpp in ../pgen/
   void UserWorkAfterLoop(ParameterInput *pin);   // called in main loop
   void UserWorkInLoop(); // called in main after each cycle
+  void MeshUserWorkInLoop(ParameterInput *pin); //MM: in ../pgen/
 
  private:
   // data

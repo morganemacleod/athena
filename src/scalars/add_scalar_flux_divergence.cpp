@@ -95,6 +95,11 @@ void PassiveScalars::AddFluxDivergence(const Real wght, AthenaArray<Real> &s_out
       }
     }
   }
+
+  //MM: call phi-zone averaging routine to update s_out
+  PhiAverageScalars(s_out,s_out);
+
+
   return;
 }
 

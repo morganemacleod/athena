@@ -386,6 +386,13 @@ void ParameterInput::ModifyFromCmdline(int argc, char *argv[]) {
     }
     pl->param_value.assign(value);   // replace existing value
 
+    
+    //MM:
+    if (Globals::my_rank==0){
+      std::cout<<"PARAMETER REPLACEMENT: "<<block<<"/"<<pl->param_name<<"="<<pl->param_value<<"\n";
+
+    }
+    
     if (value.length() > pb->max_len_parvalue) pb->max_len_parvalue = value.length();
   }
 }
