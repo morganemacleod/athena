@@ -282,6 +282,14 @@ def main(**kwargs):
     if minimum_width is None and width_min != w_phi_min:
         print('Note: phi-width not smallest width of this cell')
 
+
+        # Report cell width                                                                                                                                                                                    
+    print('\nLimiting width: {0:.3e}'.format(width_min))
+    print('-->limiting r width at base level: {0:.3e}'.format(w_r_min))
+    print('-->limiting theta width at base level: {0:.3e}'.format(w_theta_min))
+    print('-->limiting phi width at base level: {0:.3e}'.format(w_phi_min))
+
+        
     # Report ratio information
     r_ratio_optimal = log_ratio(r_max/r_min, num_r)
     print('\nGeometric ratio used: x1rat = ' + repr(r_ratio))
