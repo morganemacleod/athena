@@ -104,6 +104,9 @@
 #include "../scalars/scalars.hpp"
 #include "outputs.hpp"
 
+//MM
+#include "../globals.hpp"
+
 //----------------------------------------------------------------------------------------
 //! OutputType constructor
 
@@ -143,6 +146,11 @@ Outputs::Outputs(Mesh *pm, ParameterInput *pin) {
       op.dt = pin->GetOrAddReal(op.block_name,"dt", 0.0);
       op.dcycle = pin->GetOrAddInteger(op.block_name,"dcycle", 0);
 
+      //MM:
+      if (Globals::my_rank==0){
+	std::cout<<"OUTPUT DEFINED: "<<op.block_name<<" "<<op.next_time<<" "<<op.dt<<"\n";
+      }
+      
       if (op.dt == 0.0 && op.dcycle == 0) {
         msg << "### FATAL ERROR in Outputs constructor" << std::endl
             << "Either dt or dcycle must be specified in " << op.block_name
@@ -1369,6 +1377,7 @@ void Outputs::MakeOutputs(Mesh *pm, ParameterInput *pin, bool wtflag) {
         || (ptype->output_params.dcycle > 0
             && pm->ncycle%ptype->output_params.dcycle == 0)
         || (pm->time >= pm->tlim)
+	|| (pm->user_force_output &&  ptype->output_params.dt == 1e99)  //MM:allow user condition to force output if dt=1e99
         || (wtflag && ptype->output_params.file_type == "rst")) {
       if (rad_mom && (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED)) {
         for(int b=0; b<pm->nblocal; ++b) {
@@ -1387,6 +1396,7 @@ void Outputs::MakeOutputs(Mesh *pm, ParameterInput *pin, bool wtflag) {
     }
     ptype = ptype->pnext_type; // move to next OutputType node in singly linked list
   }
+  pm->user_force_output=false; //MM:reset the user_force_output flag
 }
 
 //----------------------------------------------------------------------------------------

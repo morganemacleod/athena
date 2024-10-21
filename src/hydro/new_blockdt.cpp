@@ -166,6 +166,7 @@ void Hydro::NewBlockTimeStep(int diagnostic_output) {
           dt1_min = dt1(i);
           dt2_min = dt2(i);
           dt3_min = dt3(i);
+	}
       }
 
       // if grid is 2D/3D, compute minimum of (v2 +/- C)
@@ -181,6 +182,7 @@ void Hydro::NewBlockTimeStep(int diagnostic_output) {
             dt1_min = dt1(i);
             dt2_min = dt2(i);
             dt3_min = dt3(i);
+	  }
         }
       }
 
@@ -197,10 +199,12 @@ void Hydro::NewBlockTimeStep(int diagnostic_output) {
             dt1_min = dt1(i);
             dt2_min = dt2(i);
             dt3_min = dt3(i);
-        }
+	  }
+	}
       }
     }
   }
+
 
   // calculate the timestep limited by the diffusion processes
   if (hdif.hydro_diffusion_defined) {

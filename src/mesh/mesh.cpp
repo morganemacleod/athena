@@ -142,6 +142,9 @@ Mesh::Mesh(ParameterInput *pin, int mesh_test) :
   ReserveMeshBlockPhysIDs();
 #endif
 
+
+  user_force_output=false; //MM: flag to force output by user 
+  
   // check number of OpenMP threads for mesh
   if (num_mesh_threads_ < 1) {
     msg << "### FATAL ERROR in Mesh constructor" << std::endl

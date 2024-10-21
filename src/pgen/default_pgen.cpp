@@ -108,3 +108,15 @@ void __attribute__((weak)) MeshBlock::UserWorkBeforeOutput(ParameterInput *pin) 
   // do nothing
   return;
 }
+
+//========================================================================================
+// MM:
+//! \fn void MeshBlock::MeshUserWorkInLoop(void)
+//  \brief Function called once every time step for user-defined work.
+//========================================================================================
+
+void __attribute__((weak)) Mesh::MeshUserWorkInLoop(ParameterInput *pin)
+{
+  // do nothing
+  return;
+}

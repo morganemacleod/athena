@@ -153,6 +153,7 @@ void HydroSourceTerms::AddSourceTerms(const Real time, const Real dt,
   // MyNewSourceTerms()
 
   //  user-defined source terms
+  // MM: added flux to usersourceterm
   if (UserSourceTerm != nullptr) {
     UserSourceTerm(pmb, time, dt, flux, prim, prim_scalar, bcc, cons, cons_scalar);
   }

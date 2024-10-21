@@ -530,7 +530,9 @@ int main(int argc, char *argv[]) {
     }
 
     pmesh->UserWorkInLoop();
+    pmesh->MeshUserWorkInLoop(pinput); //MM: mesh-level user work in loop
 
+    
     pmesh->ncycle++;
     pmesh->time += pmesh->dt;
     mbcnt += pmesh->nbtotal;
