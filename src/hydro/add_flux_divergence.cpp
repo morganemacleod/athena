@@ -92,6 +92,11 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out) {
       }
     }
   }
+
+
+  //MM: call phi-zone averaging routine to update u_out
+  PhiAverageConserved(u_out,u_out);
+
   return;
 }
 

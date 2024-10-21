@@ -187,7 +187,8 @@ using BValFunc = void (*)(
 using AMRFlagFunc = int (*)(MeshBlock *pmb);
 using MeshGenFunc = Real (*)(Real x, RegionSize rs);
 using SrcTermFunc = void (*)(
-    MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<Real> &prim,
+    MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<Real> *flux,
+    const AthenaArray<Real> &prim,
     const AthenaArray<Real> &prim_scalar, const AthenaArray<Real> &bcc,
     AthenaArray<Real> &cons, AthenaArray<Real> &cons_scalar);
 using TimeStepFunc = Real (*)(MeshBlock *pmb);
