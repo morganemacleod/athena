@@ -1,1 +1,3 @@
 python configure.py --prob pm_envelope_cool_merger --coord spherical_polar -mpi -hdf5 --hdf5_path "$TACC_HDF5_DIR"  --nscalars=8 --mpiccmd mpiicpc --cflag="$TACC_VEC_FLAGS"
+
+python configure.py --prob binary_wind_lambda -mpi -hdf5 --hdf5_path "$TACC_HDF5_DIR" --mpiccmd mpiicpc --cflag="$TACC_VEC_FLAGS"

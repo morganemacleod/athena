@@ -38,9 +38,10 @@
 #include "../outputs/outputs.hpp"
 
 
-void BinaryWind(MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<Real> *flux,
-                  const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons);
-
+void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArray<Real> *flux,
+                  const AthenaArray<Real> &prim,
+                  const AthenaArray<Real> &prim_scalar, const AthenaArray<Real> &bcc,
+                  AthenaArray<Real> &cons, AthenaArray<Real> &cons_scalar);
 
 void cross(Real (&A)[3],Real (&B)[3],Real (&AxB)[3]);
 
@@ -256,8 +257,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
 
 // Source Function for two point masses
-void BinaryWind(MeshBlock *pmb, const Real time, const Real dt, const AthenaArray<Real> *flux,
-		  const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons)
+void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArray<Real> *flux,
+                  const AthenaArray<Real> &prim,
+                  const AthenaArray<Real> &prim_scalar, const AthenaArray<Real> &bcc,
+                  AthenaArray<Real> &cons, AthenaArray<Real> &cons_scalar)
 {   
   // Gravitational acceleration from orbital motion
   for (int k=pmb->ks; k<=pmb->ke; k++) {
