@@ -81,12 +81,12 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   gamma_gas = pin->GetReal("hydro","gamma");
 
   Ggrav = pin->GetOrAddReal("problem","Ggrav",6.67408e-8);
-  GM2 = pin->GetOrAddReal("problem","M2",0.5)*Ggrav;
-  GM1 = pin->GetOrAddReal("problem","M1",0.5)*Ggrav;
+  GM2 = pin->GetOrAddReal("problem","M2",0.001)*Ggrav;
+  GM1 = pin->GetOrAddReal("problem","M1",1)*Ggrav;
 
   rsoft = pin->GetOrAddReal("problem","rsoft",0.1);
   
-  rho_surface = pin->GetOrAddReal("problem","rho_surface",1.0);
+  rho_surface = pin->GetOrAddReal("problem","rho_surface",0.001);
   lambda = pin->GetOrAddReal("problem","lambda",5.0);
 
   sma = pin->GetOrAddReal("problem","sma",1.0);
@@ -112,7 +112,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   v1i[1]=  0.0; //- vcirc*(GM2/(GM1+GM2)); 
   v1i[2] = 0.0;
   
-  x2i[0] = sma*(GM2/(GM1+GM2));
+  x2i[0] = sma*(GM1/(GM1+GM2));
   x2i[1] = 0.0;
   x2i[2] = 0.0;
   
@@ -213,30 +213,23 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 	Real cs = std::sqrt(gamma_gas*press_surface/rho_surface);
 	Real vx,vy,vz;
 
-	Real Rroche = 0.379*sma; // for q=1
+	Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;  ; // for q=GM2/GM1
 	
 
-	if(phi < phi_critical and d1 <= sma/2.){
-	  den = rho_surface;
-	  pres = press_surface;
-	  vx = 0.0;
-	  vy = 0.0;
-	  vz = 0.0;
-	}else if(phi< phi_critical and d2 <= sma/2.){
+	if(phi< phi_critical and d2 <= Rroche){
 	  den = rho_surface;
 	  pres = press_surface;
 	  vx = 0.0;
 	  vy = 0.0;
 	  vz = 0.0;
 	}else{
-	  den = rho_surface * ( pow((d1/Rroche),-2) +  pow((d2/Rroche),-2) );
+	  den = rho_surface *  pow((d2/Rroche),-2.);
 	  pres = press_surface * pow(den / rho_surface, gamma_gas);
-	  vx = ((x-x1i[0])/d1 + (x-x2i[0])/d2)*cs/2.0;  // wind directed outward from each at v=cs
-	  vy = ((y-x1i[1])/d1 + (y-x2i[1])/d2)*cs/2.0;
-	  vz = ((z-x1i[2])/d1 + (z-x2i[2])/d2)*cs/2.0;
+	  vx = ((x-x2i[0])/d2)*cs;  // wind directed outward from each at v=cs
+	  vy = ((y-x2i[1])/d2)*cs;
+	  vz = ((z-x2i[2])/d2)*cs;
 	}
 
-	
 	phydro->u(IDN,k,j,i) = den;
 	phydro->u(IM1,k,j,i) = den*vx;
 	phydro->u(IM2,k,j,i) = den*vy;
@@ -337,7 +330,8 @@ void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArr
 	
 	// STAR BOUNDARIES (note, overwrites the grav accel, ie gravitational accel is not applied in this region)
 	Real phi = PhiEff(x,y,z);
-	if(phi < phi_critical and ( d1 <= sma/2. or  d2 <= sma/2.)  ){
+	Real Rroche = std::pow(GM2 / (3.0 * GM1), 1.0/3.0) * sma;
+	if(phi < phi_critical and ( d2 <= Rroche)  ){
 	  Real press_surface = -rho_surface*phi_critical/(gamma_gas*lambda);
 	  cons(IDN,k,j,i) = rho_surface;
 	  cons(IM1,k,j,i) = 0.0;
