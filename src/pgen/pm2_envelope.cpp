@@ -257,7 +257,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real z_2 = 0;
   
   // loop over the artifical domain and do the integral of the initial condition
-  // Real accel = 0;
   Real GMenv = 0;
   for(int i=0; i<ntp; i++){
     for(int j=0; j<ntp; j++){
@@ -283,7 +282,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 	GMenv += Ggrav*dm;
 	
 	// gravitational accels in cartesian coordinates  
-	//accel += -Ggrav*dm*fspline(d2,rsoft2) * (x-x_2);
 	
       }
     }
@@ -365,7 +363,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     std::cout << "GM2a = "<< GM2a <<"\n";
     std::cout << "GM2b = "<< GM2b <<"\n";
     std::cout << "GMenv="<< GMenv << "\n";
-    std::cout << "GMenv/r^2 = " << GMenv/(sma*sma) <<"\n";
     std::cout << "Omega_orb="<< Omega_orb << "\n";
     std::cout << "Omega_env="<< Omega_envelope << "\n";
     std::cout << "a = "<< sma <<"\n";
