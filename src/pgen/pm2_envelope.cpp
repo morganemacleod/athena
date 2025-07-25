@@ -132,7 +132,7 @@ Real x1_min_derefine;
 
 bool do_pre_integrate;
 
-
+Real maxrefine_distance; 
 
 //======================================================================================
 //! \fn void Mesh::InitUserMeshData(ParameterInput *pin)
@@ -177,7 +177,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   // x2_min_level1 = pin->GetOrAddReal("problem","x2_min_level1",0.0);
   // x2_max_level1 = pin->GetOrAddReal("problem","x2_max_level1",0.0);
   x1_min_derefine = pin->GetOrAddReal("problem","x1_min_derefine",0.0);
-  
+  maxrefine_distance = pin->GetOrAddReal("problem","maxrefine_distance",1.0);
 
   // local vars
   Real rmin = pin->GetOrAddReal("mesh","x1min",0.0);
@@ -623,9 +623,9 @@ int RefinementCondition(MeshBlock *pmb)
     }
   }
   // derefine when away from pm & static region
-  if( (mindist > 4.0*rsoft2) && rmin>x1_min_derefine  ) return -1;
+  if( (mindist > 1.1*maxrefine_distance) && rmin>x1_min_derefine  ) return -1;
   // refine near point mass 
-  if(mindist <= 3.0*rsoft2) return 1;
+  if(mindist <= maxrefine_distance) return 1;
    // otherwise do nothing
   return 0;
 }
@@ -931,6 +931,13 @@ void MeshBlock::UserWorkInLoop(void)
     } // end loop over cells                   
   } // end relax
 
+  // Add timestep diagnostics
+  if(pmy_mesh->ncycle % 10 == 0){
+    if(new_block_dt_ == pmy_mesh->dt){
+      // call NewBlockTimeStep with extra diagnostic output
+      phydro->NewBlockTimeStep(1);
+    }
+  }  
   return;
 } // end of UserWorkInLoop
 
