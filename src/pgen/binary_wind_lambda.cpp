@@ -57,12 +57,12 @@ Real gamma_gas;
 
 Real Ggrav;   // G 
 Real GM2, GM1; // point masses
-Real rsoft; // softening length of PM 2
-
+Real rsoft1; // softening length of PM 2
+Real rsoft2;
 Real x1i[3], v1i[3], x2i[3], v2i[3]; // cartesian positions/vels of the secondary object, gas->particle acceleration
 Real Omega[3];  // vector rotation of the frame, initial wind
 Real sma;
-
+Real phiHillFactor;
 Real rho_surface, lambda; // planet surface variables
 Real phi_critical;
 
@@ -84,8 +84,9 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   GM2 = pin->GetOrAddReal("problem","M2",0.001)*Ggrav;
   GM1 = pin->GetOrAddReal("problem","M1",1)*Ggrav;
 
-  rsoft = pin->GetOrAddReal("problem","rsoft",0.1);
-  
+  rsoft1 = pin->GetOrAddReal("problem","rsoft1",0.1);
+  rsoft2 = pin->GetOrAddReal("problem","rsoft2",0.1);
+  phiHillFactor = pin->GetOrAddReal("problem","phiHillFactor",0.1);
   rho_surface = pin->GetOrAddReal("problem","rho_surface",0.001);
   lambda = pin->GetOrAddReal("problem","lambda",5.0);
 
@@ -125,9 +126,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Omega[1] = 0.0;
   Omega[2] = Omega_orb;
 
-  
+  Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;
+  Real phiHill = -GM2/Rroche;
+  Real cs2 = -phiHill/lambda;
   Real phi_L1 = PhiL1();
-  phi_critical = phi_crit_o_phi_L1*phi_L1;
+  phi_critical = phi_L1 + phiHillFactor*phiHill ;
   
   // Print out some info
   if (Globals::my_rank==0){
@@ -142,12 +145,18 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     std::cout << "Omega_orb="<< Omega_orb << "\n";
     std::cout << "a = "<< sma <<"\n";
     std::cout << "P = "<< 6.2832*sqrt(sma*sma*sma/(GM1+GM2)) << "\n";
-    std::cout << "rsoft ="<<rsoft<<"\n";
+    std::cout << "rsoft1 ="<<rsoft1<<"\n";
+    std::cout << "rsoft2 ="<<rsoft2<<"\n";
+    std::cout << "Rroche ="<<Rroche<<"\n";
+    std::cout << "phiHill ="<<phiHill<<"\n";
+    std::cout << "cs2 ="<<cs2<<"\n";
+    std::cout << "phi_L1 ="<<phi_L1<<"\n";
+    std::cout << "phi_critical ="<<phi_critical<<"\n";
     std::cout << "==========================================================\n";
     std::cout << "==========   BC INFO         =============================\n";
     std::cout << "==========================================================\n";
     std::cout << "rho_surface = "<< rho_surface <<"\n";
-    std::cout << "press_surface = "<< -rho_surface*phi_critical/(gamma_gas*lambda) <<"\n";
+    std::cout << "press_surface = "<< rho_surface*cs2/gamma_gas <<"\n";
     std::cout << "lambda = "<< lambda <<"\n";
     std::cout << "phi_critical ="<<phi_critical<<"\n";
     std::cout << "phi_critical/phi_L1 ="<<phi_critical/phi_L1<<"\n";
@@ -208,13 +217,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 			pow(y-x2i[1], 2) +
 			pow(z-x2i[2], 2) );
 
-
-	Real press_surface = -rho_surface*phi_critical/(gamma_gas*lambda);
+        Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;  ; // for q=GM2/GM1
+	Real phiHill = -GM2/Rroche;
+	Real cs2 = -phiHill/lambda;
+	Real press_surface = rho_surface*cs2/(gamma_gas);
 	Real cs = std::sqrt(gamma_gas*press_surface/rho_surface);
 	Real vx,vy,vz;
-
-	Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;  ; // for q=GM2/GM1
-	
 
 	if(phi< phi_critical and d2 <= Rroche){
 	  den = rho_surface;
@@ -247,8 +255,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
 
 
-
-
 // Source Function for two point masses
 void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArray<Real> *flux,
                   const AthenaArray<Real> &prim,
@@ -274,9 +280,9 @@ void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArr
 	//  COMPUTE ACCELERATIONS 
 	//
 	// PM1,2 gravitational accels in cartesian coordinates
-	Real a_x = - GM1*fspline(d1,rsoft)*(x-x1i[0]) - GM2*fspline(d2,rsoft)*(x-x2i[0]);   
-	Real a_y = - GM1*fspline(d1,rsoft)*(y-x1i[1]) - GM2*fspline(d2,rsoft)*(y-x2i[1]);  
-	Real a_z = - GM1*fspline(d1,rsoft)*(z-x1i[2]) - GM2*fspline(d2,rsoft)*(z-x2i[2]);
+	Real a_x = - GM1*fspline(d1,rsoft1)*(x-x1i[0]) - GM2*fspline(d2,rsoft2)*(x-x2i[0]);   
+	Real a_y = - GM1*fspline(d1,rsoft1)*(y-x1i[1]) - GM2*fspline(d2,rsoft2)*(y-x2i[1]);  
+	Real a_z = - GM1*fspline(d1,rsoft1)*(z-x1i[2]) - GM2*fspline(d2,rsoft2)*(z-x2i[2]);
 
 
 	// Coriolis & Centrifugal
@@ -331,8 +337,10 @@ void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArr
 	// STAR BOUNDARIES (note, overwrites the grav accel, ie gravitational accel is not applied in this region)
 	Real phi = PhiEff(x,y,z);
 	Real Rroche = std::pow(GM2 / (3.0 * GM1), 1.0/3.0) * sma;
+	Real phiHill = -GM2/Rroche;
+	Real cs2 = -phiHill/lambda;
 	if(phi < phi_critical and ( d2 <= Rroche)  ){
-	  Real press_surface = -rho_surface*phi_critical/(gamma_gas*lambda);
+	  Real press_surface = rho_surface*cs2/(gamma_gas);
 	  cons(IDN,k,j,i) = rho_surface;
 	  cons(IM1,k,j,i) = 0.0;
 	  cons(IM2,k,j,i) = 0.0;
@@ -401,11 +409,11 @@ Real PhiEff(Real x, Real y, Real z){
 		  pow(z-x2i[2], 2) );
   Real Rcyl = sqrt(x*x + y*y);
   
-  return -GM1*pspline(d1,rsoft) - GM2*pspline(d2,rsoft) - 0.5*Omega[2]*Omega[2]*Rcyl*Rcyl;
+  return -GM1*pspline(d1,rsoft1) - GM2*pspline(d2,rsoft2) - 0.5*Omega[2]*Omega[2]*Rcyl*Rcyl;
 }
 
 Real PhiL1(){
-  int n = 1000;
+  int n = 10000;
   Real x,x_L1;
   Real phi;
   Real phi_max=-1.e99;
