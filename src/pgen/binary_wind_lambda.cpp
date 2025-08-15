@@ -63,7 +63,7 @@ Real x1i[3], v1i[3], x2i[3], v2i[3]; // cartesian positions/vels of the secondar
 Real Omega[3];  // vector rotation of the frame, initial wind
 Real sma;
 Real phiHillFactor;
-Real rho_surface, lambda; // planet surface variables
+Real rho_surface, lambda_hill; // planet surface variables
 Real phi_critical;
 
 //======================================================================================
@@ -88,7 +88,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   rsoft2 = pin->GetOrAddReal("problem","rsoft2",0.1);
   phiHillFactor = pin->GetOrAddReal("problem","phiHillFactor",0.1);
   rho_surface = pin->GetOrAddReal("problem","rho_surface",0.001);
-  lambda = pin->GetOrAddReal("problem","lambda",5.0);
+  lambda_hill = pin->GetOrAddReal("problem","lambda_hill",5.0);
 
   sma = pin->GetOrAddReal("problem","sma",1.0);
   Real phi_crit_o_phi_L1 = pin->GetOrAddReal("problem","phi_critical_o_phi_L1",1.0);
@@ -128,7 +128,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;
   Real phiHill = -GM2/Rroche;
-  Real cs2 = -phiHill/lambda;
+  Real cs2 = -phiHill/lambda_hill;
   Real phi_L1 = PhiL1();
   phi_critical = phi_L1 + phiHillFactor*phiHill ;
   
@@ -157,7 +157,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     std::cout << "==========================================================\n";
     std::cout << "rho_surface = "<< rho_surface <<"\n";
     std::cout << "press_surface = "<< rho_surface*cs2/gamma_gas <<"\n";
-    std::cout << "lambda = "<< lambda <<"\n";
+    std::cout << "lambda_hill = "<< lambda_hill <<"\n";
     std::cout << "phi_critical ="<<phi_critical<<"\n";
     std::cout << "phi_critical/phi_L1 ="<<phi_critical/phi_L1<<"\n";
     std::cout << "==========================================================\n";
@@ -219,7 +219,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
         Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;  ; // for q=GM2/GM1
 	Real phiHill = -GM2/Rroche;
-	Real cs2 = -phiHill/lambda;
+	Real cs2 = -phiHill/lambda_hill;
 	Real press_surface = rho_surface*cs2/(gamma_gas);
 	Real cs = std::sqrt(gamma_gas*press_surface/rho_surface);
 	Real vx,vy,vz;
@@ -231,11 +231,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 	  vy = 0.0;
 	  vz = 0.0;
 	}else{
-	  den = rho_surface *  pow((d2/Rroche),-2.);
+	  den = 0.001*rho_surface *  pow((d2/Rroche),-2.);
 	  pres = press_surface * pow(den / rho_surface, gamma_gas);
-	  vx = ((x-x2i[0])/d2)*cs;  // wind directed outward from each at v=cs
-	  vy = ((y-x2i[1])/d2)*cs;
-	  vz = ((z-x2i[2])/d2)*cs;
+	  vx = 0;  // wind directed outward from each at v=cs
+	  vy = 0;
+	  vz = 0;
 	}
 
 	phydro->u(IDN,k,j,i) = den;
@@ -338,7 +338,7 @@ void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArr
 	Real phi = PhiEff(x,y,z);
 	Real Rroche = std::pow(GM2 / (3.0 * GM1), 1.0/3.0) * sma;
 	Real phiHill = -GM2/Rroche;
-	Real cs2 = -phiHill/lambda;
+	Real cs2 = -phiHill/lambda_hill;
 	if(phi < phi_critical and ( d2 <= Rroche)  ){
 	  Real press_surface = rho_surface*cs2/(gamma_gas);
 	  cons(IDN,k,j,i) = rho_surface;
