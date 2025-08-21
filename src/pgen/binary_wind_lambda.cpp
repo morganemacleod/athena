@@ -45,6 +45,16 @@ void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArr
 
 void cross(Real (&A)[3],Real (&B)[3],Real (&AxB)[3]);
 
+void DiodeOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
+  Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+
+void DiodeOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
+    Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+
+void DiodeOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
+      Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+ 
+
 Real fspline(Real r, Real eps);
 Real pspline(Real r, Real eps);
 
@@ -94,6 +104,16 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Real phi_crit_o_phi_L1 = pin->GetOrAddReal("problem","phi_critical_o_phi_L1",1.0);
   Real Omega_orb, vcirc;
  
+// enroll the BCs
+if(mesh_bcs[BoundaryFace::outer_x1] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::outer_x1, DiodeOuterX1);
+}
+if(mesh_bcs[BoundaryFace::outer_x2] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::outer_x2, DiodeOuterX2);
+}
+if(mesh_bcs[BoundaryFace::outer_x3] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::outer_x3, DiodeOuterX3);
+}
 
   // Enroll a Source Function
   EnrollUserExplicitSourceFunction(BinaryWind);
@@ -435,3 +455,77 @@ Real PhiL1(){
   }
   return phi_max;
 }
+
+void DiodeOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+// copy hydro variables into ghost zones, don't allow inflow
+for (int n=0; n<(NHYDRO); ++n) {
+if (n==(IVX)) {
+for (int k=ks; k<=ke; ++k) {
+for (int j=js; j<=je; ++j) {
+#pragma simd
+for (int i=1; i<=(NGHOST); ++i) {
+prim(IVX,k,j,ie+i) =  std::max( 0.0, prim(IVX,k,j,(ie-i+1)) );  // positive velocities only
+}
+}}
+} else {
+for (int k=ks; k<=ke; ++k) {
+for (int j=js; j<=je; ++j) {
+#pragma simd
+for (int i=1; i<=(NGHOST); ++i) {
+prim(n,k,j,ie+i) = prim(n,k,j,(ie-i+1));
+}
+}}
+}
+}
+}
+
+void DiodeOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n = 0; n < NHYDRO; ++n) {
+if (n == IVY) { // normal velocity in x2
+for (int k = ks; k <= ke; ++k) {
+for (int j = 1; j <= NGHOST; ++j) { // ghost zones
+for (int i = is; i <= ie; ++i) {
+prim(IVY, k, je+j, i) = std::max(0.0, prim(IVY, k, je-j+1, i)); // only outflow
+}
+}
+}
+} else {
+for (int k = ks; k <= ke; ++k) {
+for (int j = 1; j <= NGHOST; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(n, k, je+j, i) = prim(n, k, je-j+1, i);
+}
+}
+}
+}
+}
+}
+
+void DiodeOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n = 0; n < NHYDRO; ++n) {
+if (n == IVZ) { // normal velocity in x3
+for (int k = 1; k <= NGHOST; ++k) { // ghost zones
+for (int j = js; j <= je; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(IVZ, ke+k, j, i) = std::max(0.0, prim(IVZ, ke-k+1, j, i)); // only outflow
+}
+}
+}
+} else {
+for (int k = 1; k <= NGHOST; ++k) {
+for (int j = js; j <= je; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(n, ke+k, j, i) = prim(n, ke-k+1, j, i);
+}
+}
+}
+}
+}
+}
+
