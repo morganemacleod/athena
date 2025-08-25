@@ -47,13 +47,18 @@ void cross(Real (&A)[3],Real (&B)[3],Real (&AxB)[3]);
 
 void DiodeOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
   Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void DiodeInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b,
+  Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 
 void DiodeOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
     Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void DiodeInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b,
+      Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 
 void DiodeOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
       Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
- 
+void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b,
+        Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
 
 Real fspline(Real r, Real eps);
 Real pspline(Real r, Real eps);
@@ -108,16 +113,26 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 if(mesh_bcs[BoundaryFace::outer_x1] == GetBoundaryFlag("user")) {
   EnrollUserBoundaryFunction(BoundaryFace::outer_x1, DiodeOuterX1);
 }
+if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::inner_x1, DiodeInnerX1);
+}
+
 if(mesh_bcs[BoundaryFace::outer_x2] == GetBoundaryFlag("user")) {
   EnrollUserBoundaryFunction(BoundaryFace::outer_x2, DiodeOuterX2);
 }
+if (mesh_bcs[BoundaryFace::inner_x2] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::inner_x2, DiodeInnerX2);
+}
+
 if(mesh_bcs[BoundaryFace::outer_x3] == GetBoundaryFlag("user")) {
   EnrollUserBoundaryFunction(BoundaryFace::outer_x3, DiodeOuterX3);
+}
+if (mesh_bcs[BoundaryFace::inner_x3] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::inner_x3, DiodeInnerX3);
 }
 
   // Enroll a Source Function
   EnrollUserExplicitSourceFunction(BinaryWind);
-
 
   // PARTICLES
   //Real vcirc = sqrt((GM1+GM2)/sma + accel*sma);    
@@ -481,6 +496,31 @@ prim(n,k,j,ie+i) = prim(n,k,j,(ie-i+1));
 }
 }
 
+void DiodeInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n=0; n<(NHYDRO); ++n) {
+if (n==(IVX)) {
+for (int k=ks; k<=ke; ++k) {
+for (int j=js; j<=je; ++j) {
+#pragma simd
+for (int i=1; i<=(NGHOST); ++i) {
+prim(IVX,k,j,is-i) =  std::min( 0.0, prim(IVX,k,j,(is+i-1)) );  // negative velocities only
+}
+}}
+} else {
+for (int k=ks; k<=ke; ++k) {
+for (int j=js; j<=je; ++j) {
+#pragma simd
+for (int i=1; i<=(NGHOST); ++i) {
+prim(n,k,j,is-i) = prim(n,k,j,(is+i-1));
+}
+}}
+}
+}
+}
+
+
 void DiodeOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
   FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
 {
@@ -498,6 +538,30 @@ for (int k = ks; k <= ke; ++k) {
 for (int j = 1; j <= NGHOST; ++j) {
 for (int i = is; i <= ie; ++i) {
 prim(n, k, je+j, i) = prim(n, k, je-j+1, i);
+}
+}
+}
+}
+}
+}
+
+void DiodeInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n = 0; n < NHYDRO; ++n) {
+if (n == IVY) { // normal velocity in x2
+for (int k = ks; k <= ke; ++k) {
+for (int j = 1; j <= NGHOST; ++j) { // ghost zones
+for (int i = is; i <= ie; ++i) {
+prim(IVY, k, js-j, i) = std::min(0.0, prim(IVY, k, je+j-1, i)); 
+}
+}
+}
+} else {
+for (int k = ks; k <= ke; ++k) {
+for (int j = 1; j <= NGHOST; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(n, k, js-j, i) = prim(n, k, js+j-1, i);
 }
 }
 }
@@ -529,3 +593,26 @@ prim(n, ke+k, j, i) = prim(n, ke-k+1, j, i);
 }
 }
 
+void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n = 0; n < NHYDRO; ++n) {
+if (n == IVZ) { // normal velocity in x3
+for (int k = 1; k <= NGHOST; ++k) { // ghost zones
+for (int j = js; j <= je; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(IVZ, ks-k, j, i) = std::min(0.0, prim(IVZ, ks+k-1, j, i)); // only outflow
+}
+}
+}
+} else {
+for (int k = 1; k <= NGHOST; ++k) {
+for (int j = js; j <= je; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(n, ks-k, j, i) = prim(n, ks+k-1, j, i);
+}
+}
+}
+}
+}
+}
