@@ -111,7 +111,7 @@ parser.add_argument('--flux',
 
 # --nghost=[value] argument
 parser.add_argument('--nghost',
-                    default='2',
+                    default='4',
                     help='set number of ghost zones')
 
 # --nscalars=[value] argument
