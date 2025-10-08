@@ -1,0 +1,2 @@
+# Configuration command for binary mass transfer setup
+python configure.py --prob pm_envelope_cool_merger --coord spherical_polar -mpi -hdf5 --hdf5_path $HDF5_HOME --nscalars=8 --mpiccmd mpiicpx
