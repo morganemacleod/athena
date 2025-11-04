@@ -1,2 +1,6 @@
 # Configuration command for binary mass transfer setup
+# FOR INTEL MPI (NOT REC) 
 python configure.py --prob pm_envelope_cool_merger --coord spherical_polar -mpi -hdf5 --hdf5_path $HDF5_HOME --nscalars=8 --mpiccmd mpiicpx --cflag " -xCORE-AVX512"
+
+# FOR OPENMPI (THIS ONE SEEMS BETTER)
+python configure.py --prob pm_envelope_cool_merger --coord spherical_polar -mpi -hdf5 --hdf5_path $HDF5_HOME --nscalars=8 --mpiccmd mpicxx --cflag " -xCORE-AVX512"
