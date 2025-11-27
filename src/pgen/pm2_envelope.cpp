@@ -596,6 +596,10 @@ int RefinementCondition(MeshBlock *pmb)
 {
   Real mindist=1.e99;
   Real rmin = 1.e99;
+  Real loc_comx = 1.e99; //added by ARC
+  Real loc_comy = 1.e99; //added by ARC
+  Real loc_comz = 1.e99; //added by ARC
+  Real dist_com = 1.e99 // added by ARC
   int inregion = 0;
   for(int k=pmb->ks; k<=pmb->ke; k++){
     Real ph= pmb->pcoord->x3v(k);
@@ -619,13 +623,20 @@ int RefinementCondition(MeshBlock *pmb)
 	Real dist = std::min(dista,distb);
   	mindist = std::min(mindist,dist);
   	rmin    = std::min(rmin,r);
+	loc_comx = (GM2a*xi_a[0] + GM2b*xi_b[0])/(GM2a+GM2b); //x center of mass of binary added by ARC
+	loc_comy = (GM2a*xi_a[1] + GM2b*xi_b[1])/(GM2a+GM2b); //y center of mass of binary added by ARC
+	loc_comz = (GM2a*xi_a[2] + GM2b*xi_b[2])/(GM2a+GM2b); //z center of mass of binary added by ARC
+	dist_com = std::sqrt(SQR(x-loc_comx) +
+  			       SQR(y-loc_comy) +
+  			       SQR(z-loc_comz) ); // distance from z to com of binary added by ARC
       }
     }
   }
   // derefine when away from pm & static region
   if( (mindist > 1.1*maxrefine_distance) && rmin>x1_min_derefine  ) return -1;
   // refine near point mass 
-  if(mindist <= maxrefine_distance) return 1;
+  //if(mindist <= maxrefine_distance) return 1;
+  if(dist_com <= maxrefine_distance) return 1;
    // otherwise do nothing
   return 0;
 }
