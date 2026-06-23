@@ -45,6 +45,21 @@ void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArr
 
 void cross(Real (&A)[3],Real (&B)[3],Real (&AxB)[3]);
 
+void DiodeOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
+  Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void DiodeInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b,
+  Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+
+void DiodeOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
+    Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void DiodeInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b,
+      Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+
+void DiodeOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,FaceField &b,
+      Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b,
+        Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh);
+
 Real fspline(Real r, Real eps);
 Real pspline(Real r, Real eps);
 
@@ -57,13 +72,13 @@ Real gamma_gas;
 
 Real Ggrav;   // G 
 Real GM2, GM1; // point masses
-Real rsoft; // softening length of PM 2
-
+Real rsoft1; // softening length of PM 2
+Real rsoft2;
 Real x1i[3], v1i[3], x2i[3], v2i[3]; // cartesian positions/vels of the secondary object, gas->particle acceleration
 Real Omega[3];  // vector rotation of the frame, initial wind
 Real sma;
-
-Real rho_surface, lambda; // planet surface variables
+Real phiHillFactor;
+Real rho_surface, lambda_hill; // planet surface variables
 Real phi_critical;
 
 //======================================================================================
@@ -84,19 +99,40 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   GM2 = pin->GetOrAddReal("problem","M2",0.001)*Ggrav;
   GM1 = pin->GetOrAddReal("problem","M1",1)*Ggrav;
 
-  rsoft = pin->GetOrAddReal("problem","rsoft",0.1);
-  
+  rsoft1 = pin->GetOrAddReal("problem","rsoft1",0.1);
+  rsoft2 = pin->GetOrAddReal("problem","rsoft2",0.1);
+  phiHillFactor = pin->GetOrAddReal("problem","phiHillFactor",0.1);
   rho_surface = pin->GetOrAddReal("problem","rho_surface",0.001);
-  lambda = pin->GetOrAddReal("problem","lambda",5.0);
+  lambda_hill = pin->GetOrAddReal("problem","lambda_hill",5.0);
 
   sma = pin->GetOrAddReal("problem","sma",1.0);
   Real phi_crit_o_phi_L1 = pin->GetOrAddReal("problem","phi_critical_o_phi_L1",1.0);
   Real Omega_orb, vcirc;
  
+// enroll the BCs
+if(mesh_bcs[BoundaryFace::outer_x1] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::outer_x1, DiodeOuterX1);
+}
+if (mesh_bcs[BoundaryFace::inner_x1] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::inner_x1, DiodeInnerX1);
+}
+
+if(mesh_bcs[BoundaryFace::outer_x2] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::outer_x2, DiodeOuterX2);
+}
+if (mesh_bcs[BoundaryFace::inner_x2] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::inner_x2, DiodeInnerX2);
+}
+
+if(mesh_bcs[BoundaryFace::outer_x3] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::outer_x3, DiodeOuterX3);
+}
+if (mesh_bcs[BoundaryFace::inner_x3] == GetBoundaryFlag("user")) {
+  EnrollUserBoundaryFunction(BoundaryFace::inner_x3, DiodeInnerX3);
+}
 
   // Enroll a Source Function
   EnrollUserExplicitSourceFunction(BinaryWind);
-
 
   // PARTICLES
   //Real vcirc = sqrt((GM1+GM2)/sma + accel*sma);    
@@ -125,9 +161,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   Omega[1] = 0.0;
   Omega[2] = Omega_orb;
 
-  
+  Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;
+  Real phiHill = -GM2/Rroche;
+  Real cs2 = -phiHill/lambda_hill;
   Real phi_L1 = PhiL1();
-  phi_critical = phi_crit_o_phi_L1*phi_L1;
+  phi_critical = phi_L1 + phiHillFactor*phiHill ;
   
   // Print out some info
   if (Globals::my_rank==0){
@@ -142,13 +180,19 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     std::cout << "Omega_orb="<< Omega_orb << "\n";
     std::cout << "a = "<< sma <<"\n";
     std::cout << "P = "<< 6.2832*sqrt(sma*sma*sma/(GM1+GM2)) << "\n";
-    std::cout << "rsoft ="<<rsoft<<"\n";
+    std::cout << "rsoft1 ="<<rsoft1<<"\n";
+    std::cout << "rsoft2 ="<<rsoft2<<"\n";
+    std::cout << "Rroche ="<<Rroche<<"\n";
+    std::cout << "phiHill ="<<phiHill<<"\n";
+    std::cout << "cs2 ="<<cs2<<"\n";
+    std::cout << "phi_L1 ="<<phi_L1<<"\n";
+    std::cout << "phi_critical ="<<phi_critical<<"\n";
     std::cout << "==========================================================\n";
     std::cout << "==========   BC INFO         =============================\n";
     std::cout << "==========================================================\n";
     std::cout << "rho_surface = "<< rho_surface <<"\n";
-    std::cout << "press_surface = "<< -rho_surface*phi_critical/(gamma_gas*lambda) <<"\n";
-    std::cout << "lambda = "<< lambda <<"\n";
+    std::cout << "press_surface = "<< rho_surface*cs2/gamma_gas <<"\n";
+    std::cout << "lambda_hill = "<< lambda_hill <<"\n";
     std::cout << "phi_critical ="<<phi_critical<<"\n";
     std::cout << "phi_critical/phi_L1 ="<<phi_critical/phi_L1<<"\n";
     std::cout << "==========================================================\n";
@@ -208,13 +252,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 			pow(y-x2i[1], 2) +
 			pow(z-x2i[2], 2) );
 
-
-	Real press_surface = -rho_surface*phi_critical/(gamma_gas*lambda);
+        Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;  ; // for q=GM2/GM1
+	Real phiHill = -GM2/Rroche;
+	Real cs2 = -phiHill/lambda_hill;
+	Real press_surface = rho_surface*cs2/(gamma_gas);
 	Real cs = std::sqrt(gamma_gas*press_surface/rho_surface);
 	Real vx,vy,vz;
-
-	Real Rroche = std::pow(GM2/(3.0 * GM1), 1.0/3.0) * sma;  ; // for q=GM2/GM1
-	
 
 	if(phi< phi_critical and d2 <= Rroche){
 	  den = rho_surface;
@@ -223,11 +266,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 	  vy = 0.0;
 	  vz = 0.0;
 	}else{
-	  den = rho_surface *  pow((d2/Rroche),-2.);
+	  den = 0.001*rho_surface *  pow((d2/Rroche),-2.);
 	  pres = press_surface * pow(den / rho_surface, gamma_gas);
-	  vx = ((x-x2i[0])/d2)*cs;  // wind directed outward from each at v=cs
-	  vy = ((y-x2i[1])/d2)*cs;
-	  vz = ((z-x2i[2])/d2)*cs;
+	  vx = 0;  // wind directed outward from each at v=cs
+	  vy = 0;
+	  vz = 0;
 	}
 
 	phydro->u(IDN,k,j,i) = den;
@@ -243,8 +286,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   } // end loop over cells
   return;
 } // end ProblemGenerator
-
-
 
 
 
@@ -274,9 +315,9 @@ void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArr
 	//  COMPUTE ACCELERATIONS 
 	//
 	// PM1,2 gravitational accels in cartesian coordinates
-	Real a_x = - GM1*fspline(d1,rsoft)*(x-x1i[0]) - GM2*fspline(d2,rsoft)*(x-x2i[0]);   
-	Real a_y = - GM1*fspline(d1,rsoft)*(y-x1i[1]) - GM2*fspline(d2,rsoft)*(y-x2i[1]);  
-	Real a_z = - GM1*fspline(d1,rsoft)*(z-x1i[2]) - GM2*fspline(d2,rsoft)*(z-x2i[2]);
+	Real a_x = - GM1*fspline(d1,rsoft1)*(x-x1i[0]) - GM2*fspline(d2,rsoft2)*(x-x2i[0]);   
+	Real a_y = - GM1*fspline(d1,rsoft1)*(y-x1i[1]) - GM2*fspline(d2,rsoft2)*(y-x2i[1]);  
+	Real a_z = - GM1*fspline(d1,rsoft1)*(z-x1i[2]) - GM2*fspline(d2,rsoft2)*(z-x2i[2]);
 
 
 	// Coriolis & Centrifugal
@@ -331,8 +372,10 @@ void BinaryWind(MeshBlock *pmb, const Real time, const Real dt,  const AthenaArr
 	// STAR BOUNDARIES (note, overwrites the grav accel, ie gravitational accel is not applied in this region)
 	Real phi = PhiEff(x,y,z);
 	Real Rroche = std::pow(GM2 / (3.0 * GM1), 1.0/3.0) * sma;
+	Real phiHill = -GM2/Rroche;
+	Real cs2 = -phiHill/lambda_hill;
 	if(phi < phi_critical and ( d2 <= Rroche)  ){
-	  Real press_surface = -rho_surface*phi_critical/(gamma_gas*lambda);
+	  Real press_surface = rho_surface*cs2/(gamma_gas);
 	  cons(IDN,k,j,i) = rho_surface;
 	  cons(IM1,k,j,i) = 0.0;
 	  cons(IM2,k,j,i) = 0.0;
@@ -401,11 +444,11 @@ Real PhiEff(Real x, Real y, Real z){
 		  pow(z-x2i[2], 2) );
   Real Rcyl = sqrt(x*x + y*y);
   
-  return -GM1*pspline(d1,rsoft) - GM2*pspline(d2,rsoft) - 0.5*Omega[2]*Omega[2]*Rcyl*Rcyl;
+  return -GM1*pspline(d1,rsoft1) - GM2*pspline(d2,rsoft2) - 0.5*Omega[2]*Omega[2]*Rcyl*Rcyl;
 }
 
 Real PhiL1(){
-  int n = 1000;
+  int n = 10000;
   Real x,x_L1;
   Real phi;
   Real phi_max=-1.e99;
@@ -426,4 +469,150 @@ Real PhiL1(){
     std::cout << "==========================================================\n";
   }
   return phi_max;
+}
+
+void DiodeOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+// copy hydro variables into ghost zones, don't allow inflow
+for (int n=0; n<(NHYDRO); ++n) {
+if (n==(IVX)) {
+for (int k=ks; k<=ke; ++k) {
+for (int j=js; j<=je; ++j) {
+#pragma simd
+for (int i=1; i<=(NGHOST); ++i) {
+prim(IVX,k,j,ie+i) =  std::max( 0.0, prim(IVX,k,j,(ie-i+1)) );  // positive velocities only
+}
+}}
+} else {
+for (int k=ks; k<=ke; ++k) {
+for (int j=js; j<=je; ++j) {
+#pragma simd
+for (int i=1; i<=(NGHOST); ++i) {
+prim(n,k,j,ie+i) = prim(n,k,j,(ie-i+1));
+}
+}}
+}
+}
+}
+
+void DiodeInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n=0; n<(NHYDRO); ++n) {
+if (n==(IVX)) {
+for (int k=ks; k<=ke; ++k) {
+for (int j=js; j<=je; ++j) {
+#pragma simd
+for (int i=1; i<=(NGHOST); ++i) {
+prim(IVX,k,j,is-i) =  std::min( 0.0, prim(IVX,k,j,(is+i-1)) );  // negative velocities only
+}
+}}
+} else {
+for (int k=ks; k<=ke; ++k) {
+for (int j=js; j<=je; ++j) {
+#pragma simd
+for (int i=1; i<=(NGHOST); ++i) {
+prim(n,k,j,is-i) = prim(n,k,j,(is+i-1));
+}
+}}
+}
+}
+}
+
+
+void DiodeOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n = 0; n < NHYDRO; ++n) {
+if (n == IVY) { // normal velocity in x2
+for (int k = ks; k <= ke; ++k) {
+for (int j = 1; j <= NGHOST; ++j) { // ghost zones
+for (int i = is; i <= ie; ++i) {
+prim(IVY, k, je+j, i) = std::max(0.0, prim(IVY, k, je-j+1, i)); // only outflow
+}
+}
+}
+} else {
+for (int k = ks; k <= ke; ++k) {
+for (int j = 1; j <= NGHOST; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(n, k, je+j, i) = prim(n, k, je-j+1, i);
+}
+}
+}
+}
+}
+}
+
+void DiodeInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n = 0; n < NHYDRO; ++n) {
+if (n == IVY) { // normal velocity in x2
+for (int k = ks; k <= ke; ++k) {
+for (int j = 1; j <= NGHOST; ++j) { // ghost zones
+for (int i = is; i <= ie; ++i) {
+prim(IVY, k, js-j, i) = std::min(0.0, prim(IVY, k, je+j-1, i)); 
+}
+}
+}
+} else {
+for (int k = ks; k <= ke; ++k) {
+for (int j = 1; j <= NGHOST; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(n, k, js-j, i) = prim(n, k, js+j-1, i);
+}
+}
+}
+}
+}
+}
+
+void DiodeOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n = 0; n < NHYDRO; ++n) {
+if (n == IVZ) { // normal velocity in x3
+for (int k = 1; k <= NGHOST; ++k) { // ghost zones
+for (int j = js; j <= je; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(IVZ, ke+k, j, i) = std::max(0.0, prim(IVZ, ke-k+1, j, i)); // only outflow
+}
+}
+}
+} else {
+for (int k = 1; k <= NGHOST; ++k) {
+for (int j = js; j <= je; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(n, ke+k, j, i) = prim(n, ke-k+1, j, i);
+}
+}
+}
+}
+}
+}
+
+void DiodeInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+  FaceField &b, Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
+{
+for (int n = 0; n < NHYDRO; ++n) {
+if (n == IVZ) { // normal velocity in x3
+for (int k = 1; k <= NGHOST; ++k) { // ghost zones
+for (int j = js; j <= je; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(IVZ, ks-k, j, i) = std::min(0.0, prim(IVZ, ks+k-1, j, i)); // only outflow
+}
+}
+}
+} else {
+for (int k = 1; k <= NGHOST; ++k) {
+for (int j = js; j <= je; ++j) {
+for (int i = is; i <= ie; ++i) {
+prim(n, ks-k, j, i) = prim(n, ks+k-1, j, i);
+}
+}
+}
+}
+}
 }
