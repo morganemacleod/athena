@@ -33,19 +33,10 @@
 #include "../mesh/mesh.hpp"
 #include "../parameter_input.hpp"
 
-Real threshold;
-
-int RefinementCondition(MeshBlock *pmb);
 
 void Mesh::InitUserMeshData(ParameterInput *pin) {
-  if (adaptive) {
-    EnrollUserRefinementCondition(RefinementCondition);
-    threshold = pin->GetReal("problem","thr");
-  }
-
-  Real omega0 = pin->GetOrAddReal("orbital_advection", "Omega0",1.0);
-
-  std::cout << "DEBUG: Omega0 is succesfully loaded as: " << omega0 << std::flush;
+  //Real omega0 = pin->GetOrAddReal("orbital_advection", "Omega0",1.0);
+  //std::cout << "DEBUG: Omega0 is succesfully loaded as: " << omega0 << std::flush;
   
   return;
 }
@@ -63,8 +54,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   Real prat = pin->GetReal("problem", "prat");
   Real drat = pin->GetOrAddReal("problem", "drat", 1.0);
   Real gamma = peos->GetGamma();
-  Real gm1 = gamma - 1.0;
-  // Added shearing box parameters
+
+  // shearing box parameters
   Real omega0 = pin->GetReal("orbital_advection", "Omega0");
   Real qshear = pin->GetReal("orbital_advection", "qshear");
 
@@ -106,43 +97,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
               pres = std::exp(log_pres);
             }
           }
-          phydro->u(IEN,k,j,i) = pres/gm1;
+          phydro->u(IEN,k,j,i) = pres/(gamma-1);
 	}
       }
     }
   }
 
-}
-
-// refinement condition: check the maximum pressure gradient
-int RefinementCondition(MeshBlock *pmb) {
-  AthenaArray<Real> &w = pmb->phydro->w;
-  Real maxeps = 0.0;
-  if (pmb->pmy_mesh->f3) {
-    for (int k=pmb->ks-1; k<=pmb->ke+1; k++) {
-      for (int j=pmb->js-1; j<=pmb->je+1; j++) {
-        for (int i=pmb->is-1; i<=pmb->ie+1; i++) {
-          Real eps = std::sqrt(SQR(0.5*(w(IPR,k,j,i+1) - w(IPR,k,j,i-1)))
-                               +SQR(0.5*(w(IPR,k,j+1,i) - w(IPR,k,j-1,i)))
-                               +SQR(0.5*(w(IPR,k+1,j,i) - w(IPR,k-1,j,i))))/w(IPR,k,j,i);
-          maxeps = std::max(maxeps, eps);
-        }
-      }
-    }
-  } else if (pmb->pmy_mesh->f2) {
-    int k = pmb->ks;
-    for (int j=pmb->js-1; j<=pmb->je+1; j++) {
-      for (int i=pmb->is-1; i<=pmb->ie+1; i++) {
-        Real eps = std::sqrt(SQR(0.5*(w(IPR,k,j,i+1) - w(IPR,k,j,i-1)))
-                             + SQR(0.5*(w(IPR,k,j+1,i) - w(IPR,k,j-1,i))))/w(IPR,k,j,i);
-        maxeps = std::max(maxeps, eps);
-      }
-    }
-  } else {
-    return 0;
-  }
-
-  if (maxeps > threshold) return 1;
-  if (maxeps < 0.25*threshold) return -1;
-  return 0;
 }
