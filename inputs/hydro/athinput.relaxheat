@@ -4,7 +4,7 @@ problem_id = HSE      # problem ID: basename of output filenames
 <output1>
 file_type  = hdf5        # Binary data dump
 variable   = prim       # variables to be output
-dt         = 1.0      # time increment between outputs
+dt         = 10.0      # time increment between outputs
 xdmf=0
 
 <output2>
@@ -73,7 +73,7 @@ tau_relax_end   = 1000.0
 update_grav_every = 1 # how many steps between gravity update
 
 
-L_heat = 1.0e-2
+L_heat = 1.0e-4
 t_heat = -1
-r_heat_in = 0.5
-r_heat_out = 0.55
+r_heat_in = 0.8
+r_heat_out = 0.85

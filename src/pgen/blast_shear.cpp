@@ -42,6 +42,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     EnrollUserRefinementCondition(RefinementCondition);
     threshold = pin->GetReal("problem","thr");
   }
+
+  Real omega0 = pin->GetOrAddReal("orbital_advection", "Omega0",1.0);
+
+  std::cout << "DEBUG: Omega0 is succesfully loaded as: " << omega0 << std::flush;
+  
   return;
 }
 
@@ -59,6 +64,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   Real drat = pin->GetOrAddReal("problem", "drat", 1.0);
   Real gamma = peos->GetGamma();
   Real gm1 = gamma - 1.0;
+  // Added shearing box parameters
+  Real omega0 = pin->GetReal("orbital_advection", "Omega0");
+  Real qshear = pin->GetReal("orbital_advection", "qshear");
 
   // setup uniform ambient medium with spherical over-pressured region
   for (int k=ks; k<=ke; k++) {
@@ -81,9 +89,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
           }
         }
 
+	Real v2 = -qshear * omega0 * x;
+	
         phydro->u(IDN,k,j,i) = den;
         phydro->u(IM1,k,j,i) = 0.0;
-        phydro->u(IM2,k,j,i) = 0.0;
+        phydro->u(IM2,k,j,i) = den * v2;
         phydro->u(IM3,k,j,i) = 0.0;
         if (NON_BAROTROPIC_EOS) {
           Real pres = pa;
