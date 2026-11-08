@@ -53,6 +53,11 @@ x3max  = 6.283185307179586
 ix3_bc = periodic
 ox3_bc = periodic
 
+# optional shock-tracking AMR (use 16x16 meshblocks; x1min_src must be a root face):
+#refinement     = adaptive
+#numlevel       = 2
+#derefine_count = 5
+
 <meshblock>
 nx1 = 32
 nx2 = 32
@@ -69,3 +74,5 @@ M_bomb  = 3.472e33    # [g] full-sphere bomb mass (merged core m1 from pm_trackf
 E_bomb  = 1.0e51      # [erg] full-sphere thermal energy
 rho_amb = 5.0e-15     # [g cm^-3] ambient beyond source x1max (source edge: 4-7e-15)
 p_amb   = 0.1         # [erg cm^-3] (source edge: 0.09-0.13)
+#refine_dp   = 10.0      # AMR: refine if a compressing cell has |dP|/min(P) > refine_dp
+#derefine_dp = 2.0       # AMR: derefine if no compressing cell exceeds derefine_dp

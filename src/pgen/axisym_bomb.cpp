@@ -24,12 +24,21 @@
 //! Passive scalar r0 (conserved s0 = rho * r0) tags material: r0 = 1 in the bomb,
 //! r0 = 0 in the envelope and ambient medium.
 //!
-//! Hydro only, no gravity, ideal gas. Requires --coord=spherical_polar, -hdf5,
-//! --nscalars=1 (or more), and a mesh without refinement (the bomb volume is computed
-//! from the root-level radial faces).
+//! Hydro only, no gravity, ideal gas. Requires --coord=spherical_polar, -hdf5 and
+//! --nscalars=1 (or more). The bomb volume is computed from the root-level radial faces;
+//! with mesh refinement this is exact only if x1min_src lies on a root-level face (checked).
+//!
+//! Adaptive refinement (<mesh> refinement = adaptive) tracks the shock: a MeshBlock is
+//! refined if any active cell is compressing (div v < 0) and has a relative pressure jump
+//! |P_nb - P| / min(P_nb, P) > refine_dp to a neighbor in r or theta; it is derefined if no
+//! compressing cell has a jump > derefine_dp. Contacts (no P jump) and the expanding ejecta
+//! (div v > 0) do not trigger refinement.
 //! Units: those of the remap file (cgs for the merger runs).
 //!
-//! Parameters (<problem>): remap_file, M_bomb, E_bomb, rho_amb, p_amb
+//! Parameters (<problem>): remap_file, M_bomb, E_bomb, rho_amb, p_amb,
+//!                         refine_dp (default 10), derefine_dp (default 2). Calibrated on
+//!                         the merger remnant: compressive jumps in the initial envelope
+//!                         reach ~2-5, the bomb shock ~1e2-1e3.
 
 // C headers
 #include <hdf5.h>
@@ -65,6 +74,7 @@ std::vector<double> src_x1f, src_x2f, src_lnr, src_x2v;
 std::vector<double> src_rho, src_press, src_v1, src_v2, src_v3;
 int src_nr, src_nth;
 Real rho_bomb, p_bomb, rho_amb, p_amb;
+Real refine_dp, derefine_dp;   // AMR thresholds on the relative pressure jump
 
 //! read a whole 1D or 2D double dataset; returns the number of elements along each dim
 std::vector<double> ReadDataset(hid_t file, const char *name, hsize_t dims[2]) {
@@ -98,6 +108,34 @@ int LowerIndex(const std::vector<double> &x, double xq) {
 bool InBomb(Real r_outer_face) {
   return r_outer_face <= src_x1f.front() * (1.0 + 1.0e-6);
 }
+
+//! AMR criterion: refine on compressive pressure jumps (shocks), see file header.
+int ShockRefinement(MeshBlock *pmb) {
+  AthenaArray<Real> &w = pmb->phydro->w;
+  Coordinates *pc = pmb->pcoord;
+  Real max_jump = 0.0;   // largest pressure jump among compressing cells
+  for (int k = pmb->ks; k <= pmb->ke; ++k) {
+    for (int j = pmb->js; j <= pmb->je; ++j) {
+      Real sm = std::sin(pc->x2v(j-1)), s0 = std::sin(pc->x2v(j)), sp = std::sin(pc->x2v(j+1));
+      for (int i = pmb->is; i <= pmb->ie; ++i) {
+        // div v = (1/r^2) d(r^2 v_r)/dr + (1/(r sin th)) d(sin th v_th)/dth, centered
+        Real rm = pc->x1v(i-1), r0 = pc->x1v(i), rp = pc->x1v(i+1);
+        Real divv = (rp*rp*w(IVX,k,j,i+1) - rm*rm*w(IVX,k,j,i-1)) / ((rp - rm)*r0*r0)
+                    + (sp*w(IVY,k,j+1,i) - sm*w(IVY,k,j-1,i))
+                      / ((pc->x2v(j+1) - pc->x2v(j-1))*r0*s0);
+        if (divv >= 0.0) continue;
+        Real p = w(IPR,k,j,i);
+        Real pn[4] = {w(IPR,k,j,i-1), w(IPR,k,j,i+1), w(IPR,k,j-1,i), w(IPR,k,j+1,i)};
+        for (Real q : pn) {
+          max_jump = std::max(max_jump, std::abs(q - p) / std::min(q, p));
+        }
+        if (max_jump > refine_dp) return 1;
+      }
+    }
+  }
+  if (max_jump < derefine_dp) return -1;
+  return 0;
+}
 } // namespace
 
 //----------------------------------------------------------------------------------------
@@ -110,11 +148,16 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     msg << "### FATAL ERROR in axisym_bomb: requires --coord=spherical_polar" << std::endl;
     ATHENA_ERROR(msg);
   }
-  if (!NON_BAROTROPIC_EOS || multilevel || NSCALARS < 1) {
+  if (!NON_BAROTROPIC_EOS || NSCALARS < 1) {
     std::stringstream msg;
-    msg << "### FATAL ERROR in axisym_bomb: requires an adiabatic EOS, no mesh "
-        << "refinement, and --nscalars=1 (bomb tracer)" << std::endl;
+    msg << "### FATAL ERROR in axisym_bomb: requires an adiabatic EOS and "
+        << "--nscalars=1 (bomb tracer)" << std::endl;
     ATHENA_ERROR(msg);
+  }
+  if (adaptive) {
+    refine_dp = pin->GetOrAddReal("problem", "refine_dp", 10.0);
+    derefine_dp = pin->GetOrAddReal("problem", "derefine_dp", 2.0);
+    EnrollUserRefinementCondition(ShockRefinement);
   }
 
   std::string fn = pin->GetString("problem", "remap_file");
@@ -183,6 +226,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     std::stringstream msg;
     msg << "### FATAL ERROR in axisym_bomb: no radial cells inside source x1min"
         << std::endl;
+    ATHENA_ERROR(msg);
+  }
+  // with refinement, finer bomb cells cover the same volume only if x1min_src is a root face
+  if (multilevel && std::abs(r_last - src_x1f.front()) > 1.0e-6 * src_x1f.front()) {
+    std::stringstream msg;
+    msg << "### FATAL ERROR in axisym_bomb: with mesh refinement, source x1min ("
+        << src_x1f.front() << ") must lie on a root-level radial face (nearest inner face "
+        << r_last << ")" << std::endl;
     ATHENA_ERROR(msg);
   }
   rho_bomb = M_bomb / V_bomb;
