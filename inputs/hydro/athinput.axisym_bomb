@@ -1,7 +1,8 @@
 <comment>
 problem   = 2D axisymmetric thermal bomb in a remapped merger remnant
 reference = IaCSM/Analysis/make_axisym_2d.py (remap file), src/pgen/axisym_bomb.cpp
-configure = --prob=axisym_bomb --coord=spherical_polar -hdf5 [-mpi]
+configure = --prob=axisym_bomb --coord=spherical_polar --nscalars=1 -hdf5 [-mpi]
+# passive scalar r0: 1 = bomb material, 0 = envelope/ambient
 # Units: cgs (same as the remap file)
 
 <job>

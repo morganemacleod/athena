@@ -9,3 +9,8 @@ python configure.py --prob pm_envelope_cool_merger --coord spherical_polar -mpi 
 
 
 ### For Planet wind setup...
+### 2D axisymmetric thermal bomb in remapped merger remnant (axisym_bomb)
+# cluster (OpenMPI/MPICH)
+python configure.py --prob axisym_bomb --coord spherical_polar -mpi -hdf5 --hdf5_path $HDF5_HOME --nscalars=1 --mpiccmd mpicxx --cflag " -xCORE-AVX512"
+# laptop (MacPorts HDF5/OpenMPI)
+python configure.py --prob=axisym_bomb --coord=spherical_polar --nscalars=1 -hdf5 -mpi --hdf5_path=/opt/local

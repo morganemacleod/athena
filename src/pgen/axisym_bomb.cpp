@@ -21,8 +21,12 @@
 //!  - otherwise: bilinear interpolation of the primitives in (ln r, theta) from the file;
 //!    r and theta are clamped to the source cell-center range.
 //!
-//! Hydro only, no gravity, ideal gas. Requires --coord=spherical_polar, -hdf5, and a mesh
-//! without refinement (the bomb volume is computed from the root-level radial faces).
+//! Passive scalar r0 (conserved s0 = rho * r0) tags material: r0 = 1 in the bomb,
+//! r0 = 0 in the envelope and ambient medium.
+//!
+//! Hydro only, no gravity, ideal gas. Requires --coord=spherical_polar, -hdf5,
+//! --nscalars=1 (or more), and a mesh without refinement (the bomb volume is computed
+//! from the root-level radial faces).
 //! Units: those of the remap file (cgs for the merger runs).
 //!
 //! Parameters (<problem>): remap_file, M_bomb, E_bomb, rho_amb, p_amb
@@ -49,6 +53,7 @@
 #include "../hydro/hydro.hpp"
 #include "../mesh/mesh.hpp"
 #include "../parameter_input.hpp"
+#include "../scalars/scalars.hpp"
 
 #ifndef HDF5OUTPUT
 #error "axisym_bomb.cpp requires HDF5 (configure with -hdf5)"
@@ -105,10 +110,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     msg << "### FATAL ERROR in axisym_bomb: requires --coord=spherical_polar" << std::endl;
     ATHENA_ERROR(msg);
   }
-  if (!NON_BAROTROPIC_EOS || multilevel) {
+  if (!NON_BAROTROPIC_EOS || multilevel || NSCALARS < 1) {
     std::stringstream msg;
-    msg << "### FATAL ERROR in axisym_bomb: requires an adiabatic EOS and no mesh "
-        << "refinement" << std::endl;
+    msg << "### FATAL ERROR in axisym_bomb: requires an adiabatic EOS, no mesh "
+        << "refinement, and --nscalars=1 (bomb tracer)" << std::endl;
     ATHENA_ERROR(msg);
   }
 
@@ -215,8 +220,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
       for (int i = is; i <= ie; ++i) {
         Real r = pcoord->x1v(i);
         Real rho, press, v1, v2, v3;
+        Real tracer = 0.0;   // bomb material fraction (passive scalar r0)
         if (InBomb(pcoord->x1f(i+1))) {
           rho = rho_bomb; press = p_bomb; v1 = 0.0; v2 = 0.0; v3 = 0.0;
+          tracer = 1.0;
         } else if (r > x1max_src) {
           rho = rho_amb; press = p_amb; v1 = 0.0; v2 = 0.0; v3 = 0.0;
         } else {
@@ -238,6 +245,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
         phydro->u(IM2,k,j,i) = rho*v2;
         phydro->u(IM3,k,j,i) = rho*v3;
         phydro->u(IEN,k,j,i) = press/gm1 + 0.5*rho*(v1*v1 + v2*v2 + v3*v3);
+        pscalars->s(0,k,j,i) = rho*tracer;   // conserved scalar density
       }
     }
   }
