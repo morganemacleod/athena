@@ -1,0 +1,70 @@
+<comment>
+problem   = 2D axisymmetric thermal bomb in a remapped merger remnant
+reference = IaCSM/Analysis/make_axisym_2d.py (remap file), src/pgen/axisym_bomb.cpp
+configure = --prob=axisym_bomb --coord=spherical_polar -hdf5 [-mpi]
+# Units: cgs (same as the remap file)
+
+<job>
+problem_id = bomb2d
+
+<output1>
+file_type  = hdf5
+variable   = prim
+dt         = 1.0e5
+
+<output2>
+file_type  = hst
+dt         = 1.0e3
+
+<output3>
+file_type  = rst
+dt         = 1.0e30
+
+<time>
+cfl_number = 0.3
+nlim       = -1
+tlim       = 1.0e6
+integrator = vl2
+xorder     = 2
+
+<mesh>
+# log grid starting at x1min_src/2 = 1.225e11 cm. x1rat = 2^(1/32): exactly 32 radial
+# cells across the bomb shell [x1min_src/2, x1min_src], so a face falls on x1min_src.
+# x1max = x1min * x1rat^nx1 = 1.225e11 * 2^13 (slightly beyond the source x1max = 1e15,
+# that sliver is ambient).
+nx1    = 416
+x1min  = 1.225e11
+x1max  = 1.0035200e15
+x1rat  = 1.0218971486541166    # 2^(1/32)
+ix1_bc = reflecting
+ox1_bc = outflow
+
+# theta in [0, pi/2]: polar axis + reflecting equator (equatorial symmetry)
+nx2    = 64
+x2min  = 0.0
+x2max  = 1.5707963267948966
+ix2_bc = reflecting
+ox2_bc = reflecting
+
+nx3    = 1
+x3min  = 0.0
+x3max  = 6.283185307179586
+ix3_bc = periodic
+ox3_bc = periodic
+
+<meshblock>
+nx1 = 32
+nx2 = 32
+nx3 = 1
+
+<hydro>
+gamma  = 1.6          # must match the source run (make_axisym_2d.py --gamma)
+dfloor = 1.0e-20
+pfloor = 1.0e-6
+
+<problem>
+remap_file = /Users/morganmacleod/Library/CloudStorage/Dropbox/CE_princeton/IaCSM/Analysis/axisym2d_HSE00025.h5
+M_bomb  = 3.472e33    # [g] full-sphere bomb mass (merged core m1 from pm_trackfile.dat)
+E_bomb  = 1.0e51      # [erg] full-sphere thermal energy
+rho_amb = 5.0e-15     # [g cm^-3] ambient beyond source x1max (source edge: 4-7e-15)
+p_amb   = 0.1         # [erg cm^-3] (source edge: 0.09-0.13)
